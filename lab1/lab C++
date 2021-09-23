@@ -1,13 +1,16 @@
-
 #include <iostream>
 #include <string.h>
-
 int main()
 {
-  char ch(1);
-  int i(ch);
-  char ch1(6);
-  int j(-ch1);
-  std::cout<<i+j<<std::endl;  
-  return 0;
+char number1 = 1;
+int i(number1);
+char number2 = -6;
+int j(number2);
+std::cout « i+j « std::endl;
+char number3 = 250;
+int m(number3);
+char number4 = 10;
+int n(number4);
+std::cout « m+n « std::endl;
+return 0;
 }
