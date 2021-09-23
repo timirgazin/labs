@@ -1,1 +1,13 @@
 
+#include <iostream>
+#include <string.h>
+
+int main()
+{
+  char ch(1);
+  int i(ch);
+  char ch1(6);
+  int j(-ch1);
+  std::cout<<i+j<<std::endl;  
+  return 0;
+}
