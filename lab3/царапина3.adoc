@@ -1,0 +1,123 @@
+:imagesdir: Images
+[.text-center]
+МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ +
+Федеральное государственное автономное образовательное учреждение
+высшего образования +
+«Южно-Уральский государственный университет» +
+(национальный исследовательский университет) +
+Высшая школа электроники и компьютерных наук +
+Кафедра «Информационно-измерительная техника»
+
+[.text-center]
+Отчет по лабораторной работе №2.2
+
+[.text-right]
+Выполнил: +
+студент группы КЭ-415 +
+Тимиргазин И.М.
+
+== Задание к работе
+----
+а) Сделать бегущий огонь из 4 светодиодов, подключенных к портам C.5, C.8, C9, A.5
+б) Заготовка лежит с настройками портов светодиодов лежит в https://github.com/lamer0k/stm32Labs/tree/master/Lab1
+в) Сделать отчет как обычно
+
+----
+
+== Подключение платы к компьютеру
+Для начала нужно посмотреть на саму плату и выяснить, нет ли каких-либо повреждений, если повреждений не обнаружено, то подлючаем нашу плату к компьютеру. Подключение платы к компьютеру показано на рисунке 1.
+
+.Подключение платы к компьютеру
+image::image-2021-10-07-13-14-17-596.png[]
+
+== Программа для реализации бегущего огня
+Напишем программу для реализации бегущего огня, программа реализации представлена ниже.
+[source, c]
+----
+#include "rccregisters.hpp" // for RCC
+#include "gpiocregisters.hpp" //for GPIOC
+std::uint32_t SystemCoreClock = 16'000'000U;
+extern "C" {
+int __low_level_init(void)
+{
+//Switch on external 16 MHz oscillator
+RCC::CR::HSION::On::Set();
+while (RCC::CR::HSIRDY::NotReady::IsSet())
+{
+ }
+ //Switch system clock on external oscillator
+  RCC::CFGR::SW::Hsi::Set();
+ while (!RCC::CFGR::SWS::Hsi::IsSet())
+ {
+ }
+ RCC::APB2ENR::SYSCFGEN::Enable::Set();
+ return 1;
+}
+}
+ int delay(int cycles)
+{
+ for (int i =0; i< cycles; ++i)
+ {
+ asm volatile ("");
+ }
+}
+int main()
+{
+{
+for (;;)
+ {
+ RCC::AHB1ENR::GPIOCEN::Enable::Set();
+ GPIOC::MODER::MODER5::Output::Set();
+ GPIOC::ODR::ODR5::High::Set();
+ delay(500000);
+ GPIOC::ODR::ODR5::Low::Set();
+ delay(500000);
+ RCC::AHB1ENR::GPIOCEN::Enable::Set();
+ GPIOC::MODER::MODER8::Output::Set();
+ GPIOC::ODR::ODR8::High::Set();
+ delay(500000);
+ GPIOC::ODR::ODR8::Low::Set();
+ delay(500000);
+ RCC::AHB1ENR::GPIOCEN::Enable::Set();
+ GPIOC::MODER::MODER9::Output::Set();
+ GPIOC::ODR::ODR9::High::Set();
+ delay(500000);
+ GPIOC::ODR::ODR9::Low::Set();
+ delay(500000);
+ RCC::AHB1ENR::GPIOAEN::Enable::Set();
+ GPIOA::MODER::MODER5::Output::Set();
+ GPIOA::ODR::ODR5::High::Set();
+ delay(500000);
+ GPIOA::ODR::ODR5::Low::Set();
+ delay(500000);
+ }
+return 1;
+}
+}
+----
+После того, как мы запустили программу, вылезли ошибки, представленные на рисунке 2.
+
+.Ошибка
+image::image-2021-10-07-14-02-34-873.png[]
+
+Для того чтобы убрать эти ошибки, нас необходимо подключить дополнительную библиотеку. Это представлено ниже.
+[source, c]
+----
+#include "rccregisters.hpp" // for RCC
+#include "gpiocregisters.hpp" //for GPIOC
+#include "gpioaregisters.hpp" //for GPIOA
+----
+
+== Прошивка платы
+Для начала нужно создать проект, после чего в свойствах проекта выберем модель микроконтроллера ST => STM32F4 => STM32F411 => ST STM32F411RE (рисунок 4). Для этого правой кнопкой мыши щелкнем по проекту, выберем Options и далее в категории General Option выберем вкладку Target.
+
+.Выбор модели микроконтроллера
+image::image-2021-10-07-13-45-56-579.png[]
+
+После всех выполненных нами действиями, видим, что наша плата прошилась и горят светодиоды в поочередной последовательности *бегущий огонь*, что показано на рисунке 3.
+
+.Реализация бегущего огня
+image::resul'tat.gif[]
+
+
+
