@@ -1,0 +1,331 @@
+:imagesdir: images
+:figure-caption: Рисунок
+:toc:
+:toc-title: Оглавление
+= Отчет по лабораторной работе №10
+
+Выполнил студент группы КЭ-415
+Федотов Н.А.
+
+== Задание к работе
+----
+а) Написать программу, позволяющую с помощью прерываний и таймеров TIM2 и TIM3 включать и выключать светодиоды.
+б) В приложении Terminal с помощью интерфейса USART передать фразу "Hello World".
+----
+
+== Включение таймеров TIM2 и TIM3
+
+Для начала работы с таймерами, необходимо подключить библиотеки "tim2registers.hpp" и "tim3registers.hpp".
+Библиотеки представлены ниже.
+[source, cpp]
+#include "tim2registers.hpp"   //for TIM2
+#include "tim3registers.hpp"  //for TIM3
+
+Следующий шагом необходимо произвести настройку прерывания по таймерам TIM2 и TIM3. Информация по таймерам представлена на рисунке 1,2,3.
+
+.Регистр RCC_APB1ENR
+image::image-2022-02-09-14-37-11-708.png[]
+.Информация по таймерам
+image::image-2022-02-09-14-46-12-720.png[]
+.Регистр TIMx_PSC
+image::image-2022-02-09-14-50-06-279.png[]
+
+Следующим пунктом произведем настройку прерывания в регистре NVIC_INSER0. Данные таймеры, в нашем случае, показаны на рисунке 4.
+
+.Таблица прерывания таймеров
+image::image-2022-02-09-14-54-16-292.png[]
+
+Затем нам нужно включить таймер с помощью регистра TIMx_DIER и выбрать UIE, это показано на рисунке 5.
+
+.Регистр TIMx_DIER
+image::image-2022-02-09-15-02-59-257.png[]
+
+После чего включим таймер TIM2 с помощью регистра TIMx_CR1 и выберем CEN, это показано на рисунке 6.
+
+.Регистр TIMx_CR1
+image::image-2022-02-09-15-04-12-402.png[]
+
+Для корректной работы обработчика прерываний следует записать информацию в startup.cpp. Код программы представлен ниже.
+
+[source, cpp]
+#include "interrupthandler.hpp"  //for InterruptHandler
+extern "C" void __iar_program_start(void) ;
+using tIntFunct = void(*)();
+using tIntVectItem = union {tIntFunct __fun; void * __ptr;};
+#pragma segment = "CSTACK"
+#pragma location = ".intvec"
+const tIntVectItem __vector_table[] =
+{
+{ .__ptr = __sfe( "CSTACK" ) }, //????????????? ????????? ?? ????
+__iar_program_start, //????? ??????? ????? ????? ? ?????????
+  InterruptHandler::DummyHandler,
+  InterruptHandler::DummyHandler,
+  InterruptHandler::DummyHandler,
+  InterruptHandler::DummyHandler,
+  InterruptHandler::DummyHandler,
+  0,
+  0,
+  0,
+  0,
+  InterruptHandler::DummyHandler,
+  InterruptHandler::DummyHandler,
+  0,
+  InterruptHandler::DummyHandler,
+  InterruptHandler::DummyHandler,
+  //External Interrupts
+  InterruptHandler::DummyHandler,         //Window Watchdog
+  InterruptHandler::DummyHandler,         //PVD through EXTI Line detect/EXTI16
+  InterruptHandler::DummyHandler,   //Tamper and Time Stamp/EXTI21
+  InterruptHandler::DummyHandler,         //RTC Wakeup/EXTI22
+  InterruptHandler::DummyHandler,             //FLASH
+  InterruptHandler::DummyHandler,               //RCC
+  InterruptHandler::DummyHandler,         //EXTI Line 0
+  InterruptHandler::DummyHandler,         //EXTI Line 1
+  InterruptHandler::DummyHandler,         //EXTI Line 2
+  InterruptHandler::DummyHandler,        //EXTI Line 3
+  InterruptHandler::DummyHandler,         //EXTI Line 4
+  InterruptHandler::DummyHandler,       //DMA1 Stream 0
+  InterruptHandler::DummyHandler,       //DMA1 Stream 1
+  InterruptHandler::DummyHandler,       //DMA1 Stream 2
+  InterruptHandler::DummyHandler,       //DMA1 Stream 3
+  InterruptHandler::DummyHandler,       //DMA1 Stream 4
+  InterruptHandler::DummyHandler,      //DMA1 Stream 5
+  InterruptHandler::DummyHandler,      //DMA1 Stream 6
+  InterruptHandler::DummyHandler,              //ADC1
+  0,   //USB High Priority
+  0,    //USB Low  Priority
+  0,               //DAC
+  0,              //COMP through EXTI Line
+  InterruptHandler::DummyHandler,         //EXTI Line 9..5
+  InterruptHandler::DummyHandler,              //TIM9/TIM1 Break interrupt
+  InterruptHandler::DummyHandler,             //TIM10/TIM1 Update interrupt
+  InterruptHandler::DummyHandler,             //TIM11/TIM1 Trigger/Commutation interrupts
+  InterruptHandler::DummyHandler,			   //TIM1 Capture Compare interrupt
+  InterruptHandler::Timer2Handler,         //TIM2  28
+  InterruptHandler::Timer3Handler,         //TIM3  29
+  InterruptHandler::DummyHandler,        //TIM4  30
+  InterruptHandler::DummyHandler,        //  31
+  InterruptHandler::DummyHandler,        //  32
+  InterruptHandler::DummyHandler,        //  33
+  InterruptHandler::DummyHandler,        //  34
+  InterruptHandler::DummyHandler,        //  35
+  InterruptHandler::DummyHandler,        //  36
+  InterruptHandler::DummyHandler,        //  37
+  InterruptHandler::Usart2Handler,        //USART2  38
+};
+extern "C" void __cmain(void) ;
+extern "C" __weak void __iar_init_core(void) ;
+extern "C" __weak void __iar_init_vfp(void) ;
+#pragma required = __vector_table
+void __iar_program_start(void) {
+__iar_init_core() ;
+__iar_init_vfp() ;
+__cmain() ;
+}
+
+== Подключение таймера TIM3
+
+[source, cpp]
+    // TIM3
+    RCC::APB1ENR::TIM3EN::Enable::Set();
+    TIM3::PSC::Write(TimerPrescaler);
+    TIM3::ARR::Write(500);
+    TIM3::CNT::Write(0);
+    NVIC::ISER0::Write(1<<29U);
+    TIM3::DIER::UIE::Set(1);
+    TIM3::CR1::CEN::Set(1);
+
+Покажем функцию прерывания таймера TIM3.
+
+[source, cpp]
+      static void Timer3Handler()
+    {
+      if (TIM3::SR::UIF::UpdatePending::IsSet())
+      {
+        TIM3::SR::UIF::Set(0);
+        GPIOC::ODR::Toggle(1 << 5) ;
+      }
+    }
+
+== Передача фразы "Hello World".
+
+Для начала покажем структуру класса MessageTransmitter в приложении StarUML. Структура показана на рисунке 7.
+
+.Структура класса MessageTransmitter
+image::image-2022-02-09-15-21-11-562.png[]
+
+Код класса messagetransmitter.cpp.
+
+[source, cpp]
+#include "messagetransmitter.h"
+#include "usart2registers.hpp" // for USART2
+    void MessageTransmitter::Send(const std::string& message)
+    {
+    std::copy_n(message.begin(), message.size(), buffer.begin());
+    byteCounter = 0;
+    USART2::DR::Write(buffer[byteCounter]);
+    USART2::CR1::TE::Enable::Set();
+    USART2::CR1::TXEIE::Enable::Set();
+    byteCounter++;
+    }
+    void MessageTransmitter::OnByteTransmit()
+    {
+    if(byteCounter <= messageLength)
+    {
+    USART2::DR::Write(buffer[byteCounter]);
+    byteCounter++;
+    }
+    else
+    {
+    USART2::CR1::TE::Disable::Set();
+    USART2::CR1::TXEIE::Disable::Set(); /
+    }
+    }
+
+Код класса messagetransmitter.h.
+
+[source, cpp]
+#pragma once
+#include <string> // for std::string
+#include <array> // for std::array
+    class MessageTransmitter
+    {
+    public:
+      static void Send(const std::string& message);
+      static void OnByteTransmit();
+    private:
+      inline static std::array<uint8_t, 255> buffer = {};
+      inline static size_t byteCounter;
+      inline static size_t messageLength;
+    };
+
+После чего в библиотеке usart2registers.cpp поменяем значение Value0 на Disable, а также значение Value1 на значение Enable. Код представлен ниже.
+
+[source, cpp]
+template <typename Reg, size_t offset, size_t size, typename AccessMode, typename BaseType>
+struct USART2_CR1_TXEIE_Values: public RegisterField<Reg, offset, size, AccessMode>
+{
+  using Disable = FieldValue<USART2_CR1_TXEIE_Values, BaseType, 0U> ;
+  using Enable = FieldValue<USART2_CR1_TXEIE_Values, BaseType, 1U> ;
+} ;
+template <typename Reg, size_t offset, size_t size, typename AccessMode, typename BaseType>
+struct USART2_CR1_TCIE_Values: public RegisterField<Reg, offset, size, AccessMode>
+{
+using Disable = FieldValue<USART2_CR1_TCIE_Values, BaseType, 0U> ;
+using Enable = FieldValue<USART2_CR1_TCIE_Values, BaseType, 1U> ;
+} ;
+template <typename Reg, size_t offset, size_t size, typename AccessMode, typename BaseType>
+struct USART2_CR1_RXNEIE_Values: public RegisterField<Reg, offset, size, AccessMode>
+{
+using Value0 = FieldValue<USART2_CR1_RXNEIE_Values, BaseType, 0U> ;
+using Value1 = FieldValue<USART2_CR1_RXNEIE_Values, BaseType, 1U> ;
+} ;
+template <typename Reg, size_t offset, size_t size, typename AccessMode, typename BaseType>
+struct USART2_CR1_IDLEIE_Values: public RegisterField<Reg, offset, size, AccessMode>
+{
+using Value0 = FieldValue<USART2_CR1_IDLEIE_Values, BaseType, 0U> ;
+using Value1 = FieldValue<USART2_CR1_IDLEIE_Values, BaseType, 1U> ;
+} ;
+template <typename Reg, size_t offset, size_t size, typename AccessMode, typename BaseType>
+struct USART2_CR1_TE_Values: public RegisterField<Reg, offset, size, AccessMode>
+{
+using Disable = FieldValue<USART2_CR1_TE_Values, BaseType, 0U> ;
+using Enable = FieldValue<USART2_CR1_TE_Values, BaseType, 1U> ;
+} ;
+
+Также в файле main.cpp запишем код для использования интерфейса USART.
+
+[source, cpp]
+
+//#include <cstdint>            //for int types such as uint32_t
+#include "gpiocregisters.hpp" //for Gpioc
+#include "gpioaregisters.hpp" //for Gpioa
+#include "rccregisters.hpp"   //for RCC
+#include "tim2registers.hpp"   //for TIM2
+#include "tim3registers.hpp"  //for TIM3
+#include "nvicregisters.hpp"  //for NVIC
+#include "usart2registers.hpp" //for USART2
+#include <string> //for std:: string
+#include "messagetransmitter.h" //for MessageTransmitter
+using namespace std ;
+constexpr auto TimerPrescaler = 16000U;
+constexpr auto TimerClock = 10U;
+extern "C"
+{
+int __low_level_init(void)
+{
+//Switch on external 16 MHz oscillator
+RCC::CR::HSION::On::Set() ;
+while (!RCC::CR::HSIRDY::Ready::IsSet())
+{
+    }
+    //Switch system clock on external oscillator
+    RCC::CFGR::SW::Hsi::Set() ;
+    while (!RCC::CFGR::SWS::Hsi::IsSet())
+    {
+    }
+    RCC::AHB1ENR::GPIOCEN::Enable::Set();
+    GPIOC::MODER::MODER8::Output::Set();
+    GPIOC::MODER::MODER5::Output::Set();
+   // GPIOC::MODER::MODER9::Output::Set();
+    // TIM2
+    RCC::APB1ENR::TIM2EN::Enable::Set();
+    TIM2::PSC::Write(TimerPrescaler);
+    TIM2::ARR::Write(1000);
+    TIM2::CNT::Write(0);
+    NVIC::ISER0::Write(1<<28U);
+    TIM2::DIER::UIE::Enable::Set();
+    TIM2::CR1::CEN::Enable::Set();
+    // TIM3
+    RCC::APB1ENR::TIM3EN::Enable::Set();
+    TIM3::PSC::Write(TimerPrescaler);
+    TIM3::ARR::Write(500);
+    TIM3::CNT::Write(0);
+    NVIC::ISER0::Write(1<<29U);
+    TIM3::DIER::UIE::Set(1);
+    TIM3::CR1::CEN::Set(1);
+    RCC::AHB1ENR::GPIOAEN::Enable::Set();
+    GPIOA::MODER::MODER2::Alternate::Set();
+    GPIOA::MODER::MODER3::Alternate::Set();
+    GPIOA::AFRL::AFRL2::Af7::Set();  // USART2 Tx
+    GPIOA::AFRL::AFRL3::Af7::Set();  // USART2 Rx
+    //USART2
+    RCC::APB1ENR::USART2EN::Enable::Set();
+    USART2::CR1::OVER8::OversamplingBy16::Set();
+    USART2::CR1::M::Data8bits::Set();
+    USART2::CR1::PCE::ParityControlDisable::Set();
+    USART2::BRR::Write(8'000'000 / 9600); //8MGz
+    NVIC::ISER1::Write(1 << 6U);
+  return 1;
+}
+}
+void delayMs(uint32_t value)
+{
+const auto delay = (value * TimerClock) / 1000U;
+TIM2::ARR::Write(delay);
+TIM2::SR::UIF::NoUpdate::Set();
+TIM2::CNT::Write(0U);
+TIM2::CR1::CEN::Enable::Set();
+while (TIM2::SR::UIF::NoUpdate::IsSet())
+{
+}
+TIM2::SR::UIF::NoUpdate::Set();
+TIM2::CR1::CEN::Disable::Set();
+}
+int main()
+{
+std::string testMessage = "Hello World:)";
+MessageTransmitter::Send(testMessage);
+for(;;)
+{
+}
+  return 0 ;
+}
+
+== Результат проделанной работы.
+
+.Результат нашей выполненной программы
+image::IMG_E5874.gif[]
+
+.Вывод сообщения в программе Terminal
+image::image-2022-02-09-15-54-39-243.png[]
