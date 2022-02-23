@@ -1,0 +1,297 @@
+:imagesdir: images
+:figure-caption: Рисунок
+:toc:
+:toc-title: Оглавление
+= Отчет по лабораторной работе №11
+
+Выполнил студент группы КЭ-415
+Федотов Н.А.
+
+== Задание к работе
+----
+а) Рассмотреть теорию.
+б) Написать программу, которая позволяет моргать светодиодами, с использованием операционных систем реального времени.
+----
+
+== Операционная система реального времени OCPB
+
+Операционные системы реального времени (ОСРВ(RTOS)) предназначены для обеспечения интерфейса к ресурсам критических по времени систем реального времени. Основной задачей в таких системах
+является своевременность (timeliness) выполнения обработки данных.
+
+Задачей ОСРВ является обеспечение реакции на определенное действие за отведенный квант времени.
+Для разных задач такой квант может иметь разное значение, например, для обработки . Приблизительное время реакции в зависимости от области применения ОСРВ может быть следующее:
+
+* математическое моделирование - несколько микросекунд;
+* радиолокация - несколько миллисекунд;
+* складской учет - несколько секунд;
+* управление производством - несколько минут.
+
+Временем реакции системы на события – интервал времени от события на объекте и до выполнения первой инструкции в программе обработки этого события.
+
+Еще одной задаче ОСРВ является обеспечение многозадачности (или псевдомногозадачности – обеспечение мнимого видения одновременного исполнения нескольких операций).
+
+Традиционно существует 2 версии многозадачности:
+
+* «Мягкого» реального времени(soft real time)
+* «Жесткого» реального времени(hard real time)
+
+К ОСРВ мягкого типа можно отнести наши с Вами компьютеры т.е. пользователь должен видеть, что, например, нажав кнопку с символом, он видит введенный символ, а если же он нажал кнопку, и спустя время не увидел реакции, то ОС будет считать задачу «не
+отвечающей»( по аналогии с Windows — «Программа не отвечает»), но ОС остается пригодной для использования. Таким образом, ОСРВ мягкого времени просто определяет предполагаемое время ответа, и если оно истекло, то ОС относит задачу к не отвечающим.
+
+К ОСРВ жесткого типа, как раз относят ОСРВ во встраиваемых устройствах. В чем-то они похоже на ОСРВ на десктопах(многопоточное выполнение на одном процессоре), но и имеют главное отличие — каждая задача должна  выполняться за отведенный квант времени, не выполнение данного условия ведет к краху все системы.
+
+Многозадачность – одновременное выполнение нескольких задач.
+
+Существует несколько видов многозадачность
+
+* Кооперативная - следующая задача не выполнится, пока полностью не завершена предыдущая;
+* Вытесняющая – более высоко-приоритетная задача может вытеснить менее приоритетную.
+
+В ОСРВ, вместо прерываний используются задачи, которые вызываются планировщиком каждый раз по прерыванию системного таймера (например раз в 1 мс) или при непосредственном вызове планировщика.
+
+* В кооперативной многозадачности планировщик смотрит, завершена ли текущая задача и готова ли следующая (с большим приоритетом)
+* В вытесняющей планировщик смотрит, готова ли более высокоприоритетная задача, если да, он прерывает работу менее приоритетной задачи и вызывает задачу в большим приоритетом.
+* Планировщик озаботится тем, чтобы у каждой задачи все сохранялось и запоминалось: текущее положение, стек, переменные, регистры.
+
+Принцип работы показан на рисунке 1.
+
+.Принцип переключения задач
+image::image-2022-02-23-15-01-37-632.png[]
+
+Free RTOS - бесплатная многозадачная операционная система реального времени (ОСРВ) для встраиваемых систем. Портирована на 35 микропроцессорных архитектур.
+
+Планировщик системы очень маленький и простой, однако можно задать различные приоритеты процессов, вытесняющую и невытесняющую многозадачность, семафоры и очереди.
+
+.Задача
+image::image-2022-02-23-15-08-57-824.png[]
+
+== Структура программы
+
+Для того, чтобы написать программу, нам необходимо для облегчения сделать структуру программы.
+Структура программы показана на рисунке 2.
+
+.Структура программы
+image::image-2022-02-23-15-25-03-356.png[]
+
+== Написание программы
+
+Рассмотрим все классы:
+
+=== Класс myfirsttask.h
+Класс myfirsttask.h предназначен для того, чтобы наследовать класс Thread с методом Execute.
+
+Код класса myfirsttask.h представлен ниже:
+
+[source, cpp]
+#pragma once
+#include "thread.hpp" //for Thread
+class MyFirstTask: public OsWrapper::Thread<200>
+{
+public:
+void Execute() override;
+};
+
+=== Класс myfirsttask.cpp
+Класс myfirsttask.cpp предназначен для описания метода Execute. При вызове данной задачи загорается светодиод, а с помощью функции Sleep  задача "начинает спать" на 125 мс.
+
+Код класса myfirsttask.cpp представлен ниже:
+
+[source, cpp]
+#include "myfirsttask.h"
+#include "gpiocregisters.hpp"
+void MyFirstTask::Execute()
+{
+for(;;)
+{
+GPIOC::ODR::Toggle(1 << 8);
+Sleep(125ms);
+}
+}
+
+=== Класс buttontask.h
+Класс buttontask.h предназначен для того, чтобы наследовать класс Thread, а также посылать сообщение о нажатии кнопки с помощью MailBox.
+
+Код buttontask.h представлен ниже:
+
+[source, cpp]
+#pragma once
+#include "thread.hpp" //for Thread
+#include "event.hpp" //for Event
+#include "mailbox.hpp" //for MailBox
+class ButtonTask: public OsWrapper::Thread<100>
+{
+public:
+ButtonTask(OsWrapper::MailBox<int, 1>& mailBox): buttonMailBox(mailBox)
+{
+}
+void Execute() override;
+private:
+OsWrapper::MailBox<int, 1>& buttonMailBox;
+int myMessage = 1;
+};
+
+=== Класс buttontask.cpp
+Класс buttontask.cpp предназначен для того, чтобы проверить нажатие кнопки и, если данное событие произошло, записать его в buttontask.h с помощью переменной Put(myMessage) , а затем усыпить на 250 мс.
+
+Код buttontask.cpp представлен ниже:
+
+[source, cpp]
+#include "buttontask.h"
+#include "gpiocregisters.hpp" //for GPIOC
+void ButtonTask::Execute()
+{
+for(;;)
+{
+if(GPIOC::IDR::IDR13::Low::IsSet())
+{
+buttonMailBox.Put(myMessage);
+}
+Sleep(250ms);
+}
+}
+
+=== Класс ledtask.h
+Класс ledtask.h предназначен для того, чтобы описать переменные для ledtask.cpp.
+
+Код ledtask.h представлен ниже:
+
+[source, cpp]
+#pragma once
+#include "thread.hpp" //for Thread
+#include "event.hpp"  //for Event
+#include "mailbox.hpp" //for MailBox
+class LedTask: public OsWrapper::Thread<100>
+{
+public:
+LedTask(OsWrapper::MailBox<int, 1>& mailBox): buttonMailBox(mailBox)
+{
+}
+void Execute() override;
+private:
+OsWrapper::MailBox<int, 1>& buttonMailBox;
+int myMessage = 1;
+};
+
+=== Класс ledtask.cpp
+Класс ledtask.cpp предназначен для того, чтобы описать метод Executive, который, в свою очередь, проверяет нажатие кнопки, и если данное событие происходит, то зажигает два светодиода, а после усыпляет на 125 мс.
+
+Код ledtask.cpp предсавлен ниже:
+
+[source, cpp]
+#include "ledtask.h"
+#include "gpiocregisters.hpp" //for GPIOC
+void LedTask::Execute()
+{
+for(;;)
+{
+if(buttonMailBox.Get(myMessage, 500))
+{
+GPIOC::ODR::Toggle(1 << 9);
+GPIOC::ODR::Toggle(1 << 5);
+}
+Sleep(125ms);
+}
+}
+
+=== Класс mysecondtask.h
+Класс mysecondtask.h предназначен для того, чтобы наследовать класс Thread с методом Execute.
+
+Код mysecondtask.h представлен ниже:
+
+[source, cpp]
+#pragma once
+#include "thread.hpp" //for Thread
+class MySecondTask: public OsWrapper::Thread<200>
+{
+public:
+void Execute() override;
+};
+
+=== Класс mysecondtask.cpp
+Класс mysecondtask.cpp предназначен для того, чтобы описать метод Execute, который, в свою очередь, зажигает два светодиода, а потом засыпает на 1500 мс.
+
+Код mysecondtask.cpp представлен ниже:
+
+[source, cpp]
+#include "mysecondtask.h"
+#include "gpiocregisters.hpp"
+void MySecondTask::Execute()
+{
+for(;;)
+{
+GPIOC::ODR::Toggle(1 << 8);
+GPIOC::ODR::Toggle(1 << 9);
+SleepUntil(1500ms);
+}
+}
+
+=== main.cpp
+
+Код main.cpp представлен ниже:
+
+[source, cpp]
+#include "rtos.hpp"         // for Rtos
+#include "mailbox.hpp"      // for Mailbox
+#include "event.hpp"        // for Event
+#include "mytask.hpp"       // for MyTask
+#include "led1task.hpp"     // for Led1Task
+#include "myfirsttask.h"    // for MyFirstTask
+#include "mysecondtask.h"   // for MySecondTask
+#include "buttontask.h"    // for ButtonTask
+#include "ledtask.h"    // for LedTask
+#include "rccregisters.hpp" // for RCC
+#include "Application/Diagnostic/GlobalStatus.hpp"
+#include <gpioaregisters.hpp>  // for GPIOA
+#include <gpiocregisters.hpp>  // for GPIOC
+std::uint32_t SystemCoreClock = 16'000'000U;
+extern "C" {
+int __low_level_init(void)
+{
+//Switch on external 16 MHz oscillator
+RCC::CR::HSION::On::Set();
+while (RCC::CR::HSIRDY::NotReady::IsSet())
+{
+  }
+  //Switch system clock on external oscillator
+  RCC::CFGR::SW::Hsi::Set();
+  while (!RCC::CFGR::SWS::Hsi::IsSet())
+ {
+  }
+  //Switch on clock on PortA and PortC
+  RCC::AHB1ENRPack<
+      RCC::AHB1ENR::GPIOCEN::Enable,
+      RCC::AHB1ENR::GPIOAEN::Enable
+  >::Set();
+  RCC::APB2ENR::SYSCFGEN::Enable::Set();
+  //LED1 on PortA.5, set PortA.5 as output
+  GPIOA::MODER::MODER5::Output::Set();
+  /* LED2 on PortC.9, LED3 on PortC.8, LED4 on PortC.5 so set PortC.5,8,9 as output */
+  GPIOC::MODERPack<
+      GPIOC::MODER::MODER5::Output,
+      GPIOC::MODER::MODER8::Output,
+      GPIOC::MODER::MODER9::Output
+  >::Set();
+  return 1;
+}
+}
+OsWrapper::MailBox<int, 1> buttonMailBox;
+ButtonTask buttonTask(buttonMailBox);
+LedTask ledTask(buttonMailBox);
+MyFirstTask myFirstTask;
+MySecondTask mySecondTask;
+int main()
+{
+using namespace OsWrapper;
+  Rtos::CreateThread(myFirstTask, "MyFirstTask", ThreadPriority::highest);
+  Rtos::CreateThread(buttonTask, "ButtonTask", ThreadPriority::normal);
+  Rtos::CreateThread(ledTask, "LedTask", ThreadPriority::normal);
+  Rtos::Start();
+  return 0;
+}
+
+== Результат проделанной работы.
+
+.Результат нашей выполненной программы
+image::IMG_12412-min.gif[]
+
+
